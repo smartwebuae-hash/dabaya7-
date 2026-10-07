@@ -31,6 +31,7 @@
   --green:#5BC48A;--red:#FF6B5B;--ticket:#2A1D14;
 }
 *,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:16px;line-height:1.6}
 button,input,select,textarea{font:inherit;color:inherit}
@@ -151,7 +152,10 @@ td.num{direction:ltr;text-align:left}
 .sec-title{font-family:var(--display);font-weight:400;font-size:1.4rem;color:var(--orange);margin:22px 0 8px}
 table.days-table{min-width:460px}
 .chip.cook{background:transparent;border:1.5px solid var(--orange);color:var(--orange)}
-.print-only{display:none}
+.qty-row{display:flex;gap:6px}
+.qty-row input{flex:1;min-width:0;text-align:center!important}
+.qbtn{width:44px;flex:none;border:1.5px solid var(--line);background:var(--surface);border-radius:10px;font-weight:700;color:var(--orange)}
+.print-only{display:none!important}
 .signs{display:flex;justify-content:space-between;gap:30px;margin-top:40px}
 .signs div{flex:1;border-top:1px solid #000;padding-top:6px;text-align:center}
 
@@ -159,7 +163,8 @@ table.days-table{min-width:460px}
 @media print{
   :root{--bg:#fff;--surface:#fff;--ink:#000;--muted:#444;--ticket:#fff;padding:0}
   .no-print,.fab,.tabs,.picker,.sale-actions,.top-actions,td.act,th.act{display:none!important}
-  .print-only{display:block}
+  .print-only{display:block!important}
+  .signs.print-only{display:flex!important}
   .wrap{padding:0;max-width:none}
   .sale,.ticket{break-inside:avoid}
   .table-box{overflow:visible;border:0}
@@ -214,7 +219,7 @@ table.days-table{min-width:460px}
     <div class="autobox" id="autoBox">
       <button class="btn" type="button" id="autoBtn">📷 تعبئة تلقائية من صورة الفاتورة</button>
       <input type="file" id="fAuto" accept="image/*" hidden>
-      <p class="status" id="autoStatus" role="status">صوّر الفاتورة وسيتم تعبئة الاسم والرقم والنوع والطبخ والعدد والمبلغ وطريقة الدفع. راجع البيانات قبل الحفظ.</p>
+      <p class="status" id="autoStatus" role="status">صوّر الفاتورة وسيتم تعبئة الاسم والرقم والنوع والعدد والمبلغ وطريقة الدفع. راجع البيانات قبل الحفظ.</p>
       <div class="keyrow" id="keyRow" hidden>
         <input id="geminiKey" placeholder="ضع مفتاح Google Gemini هنا (مجاني)" autocomplete="off">
         <small>يُحفظ المفتاح على هذا الجهاز فقط. تحصل عليه مجانًا من aistudio.google.com</small>
@@ -241,20 +246,13 @@ table.days-table{min-width:460px}
           <input type="radio" name="fType" id="tSheep" value="خروف" checked><label for="tSheep">🐑 خروف</label>
           <input type="radio" name="fType" id="tGoat" value="تيس"><label for="tGoat">🐐 تيس</label>
           <input type="radio" name="fType" id="tCamel" value="حوار"><label for="tCamel">🐪 حوار</label>
+          <input type="radio" name="fType" id="tCook" value="طبخ"><label for="tCook">🍲 طبخ</label>
         </div>
-      </div>
-      <div class="field">
-        <span class="lbl">طبخ</span>
-        <div class="seg">
-          <input type="radio" name="fCook" id="cNo" value="no" checked><label for="cNo">بدون طبخ</label>
-          <input type="radio" name="fCook" id="cYes" value="yes"><label for="cYes">🍲 مع طبخ</label>
-        </div>
-        <input id="fCookNote" placeholder="نوع الطبخ (مثال: مندي، مضغوط، مظبي)" autocomplete="off" style="margin-top:8px" hidden>
       </div>
       <div class="row2">
         <div class="field">
           <label for="fQty">العدد</label>
-          <input id="fQty" type="number" inputmode="numeric" min="1" step="1" value="1" class="ltr">
+          <div class="qty-row"><button type="button" dir="ltr" class="qbtn" data-q="-0.5" aria-label="ناقص نص">−½</button><input id="fQty" type="number" inputmode="decimal" min="0.5" step="0.5" value="1" class="ltr"><button type="button" dir="ltr" class="qbtn" data-q="0.5" aria-label="زائد نص">+½</button></div>
         </div>
         <div class="field">
           <label for="fPrice">المبلغ الإجمالي (د.إ)</label>
@@ -327,6 +325,7 @@ let editingId=null, formImgs=[], pendingDelete=null;
 function pad(n){return String(n).padStart(2,'0')}
 function todayStr(){const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
 function money(n){return (Math.round((+n||0)*100)/100).toLocaleString('en-US',{maximumFractionDigits:2})+' د.إ'}
+function qtyTxt(q){q=Math.round((+q||0)*100)/100;const w=Math.floor(q),f=Math.round((q-w)*100)/100;if(f===0.5)return w?w+' ونص':'نص';return String(q)}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function dayLabel(ds){const [y,m,d]=ds.split('-').map(Number);const dt=new Date(y,m-1,d);return AR_DAYS[dt.getDay()]+' '+d+' '+AR_MONTHS[m-1]+' '+y}
 function monthLabel(ms){const [y,m]=ms.split('-').map(Number);return AR_MONTHS[m-1]+' '+y}
@@ -343,23 +342,22 @@ function dbDel(id){if(!db)return Promise.resolve();return new Promise((res,rej)=
 function summarize(list){
   const s={total:0,sheep:0,goats:0,camels:0,cook:0,ops:list.length,pay:{}};
   PAYS.forEach(p=>s.pay[p]=0);
-  list.forEach(x=>{s.total+=+x.total||0;if(x.type==='تيس')s.goats+=+x.qty||0;else if(x.type==='حوار')s.camels+=+x.qty||0;else s.sheep+=+x.qty||0;if(x.cook)s.cook++;s.pay[x.pay]=(s.pay[x.pay]||0)+(+x.total||0)});
+  list.forEach(x=>{s.total+=+x.total||0;if(x.type==='تيس')s.goats+=+x.qty||0;else if(x.type==='حوار')s.camels+=+x.qty||0;else if(x.type==='طبخ')s.cook+=+x.qty||0;else s.sheep+=+x.qty||0;s.pay[x.pay]=(s.pay[x.pay]||0)+(+x.total||0)});
   return s;
 }
 function ticket(title,s,totalLabel){
   let rows=`<div class="t-row"><span>عدد العمليات</span><b>${s.ops}</b></div>
-  <div class="t-row"><span>عدد الخراف</span><b>${s.sheep}</b></div>
-  <div class="t-row"><span>عدد التيوس</span><b>${s.goats}</b></div>
-  <div class="t-row"><span>عدد الحوار</span><b>${s.camels}</b></div>
-  <div class="t-row"><span>طلبات الطبخ</span><b>${s.cook}</b></div>`;
+  <div class="t-row"><span>عدد الخراف</span><b>${qtyTxt(s.sheep)}</b></div>
+  <div class="t-row"><span>عدد التيوس</span><b>${qtyTxt(s.goats)}</b></div>
+  <div class="t-row"><span>عدد الحوار</span><b>${qtyTxt(s.camels)}</b></div>
+  <div class="t-row"><span>طبخ (ذبيحة الزبون)</span><b>${qtyTxt(s.cook)}</b></div>`;
   PAYS.forEach(p=>{if(s.pay[p])rows+=`<div class="t-row"><span>${p}</span><b>${money(s.pay[p])}</b></div>`});
   return `<section class="ticket"><h2>${title}</h2>${rows}
   <div class="t-total"><span>${totalLabel}</span><strong>${money(s.total)}</strong></div></section>`;
 }
 function chips(x){
   const n=(x.images||[]).length;
-  return `<div class="chips"><span class="chip">${x.type==='تيس'?'🐐':x.type==='حوار'?'🐪':'🐑'} ${esc(x.type)} × ${x.qty}</span>
-  ${x.cook?`<span class="chip cook">🍲 طبخ${x.cookNote?': '+esc(x.cookNote):''}</span>`:''}
+  return `<div class="chips"><span class="chip">${x.type==='تيس'?'🐐':x.type==='حوار'?'🐪':x.type==='طبخ'?'🍲':'🐑'} ${esc(x.type)} × ${qtyTxt(x.qty)}</span>
   <span class="chip ${x.pay==='آجل'?'pay-credit':''}">${esc(x.pay)}</span>
   ${n?`<span class="chip">📎 ${n} صورة</span>`:''}</div>`;
 }
@@ -391,13 +389,13 @@ function render(){
     const days={};list.forEach(x=>(days[x.date]=days[x.date]||[]).push(x));
     let rows='';
     Object.keys(days).sort().forEach(d=>{
-      days[d].forEach(x=>{rows+=`<tr><td>${d.slice(8)}/${d.slice(5,7)}</td><td>${esc(x.name)}</td><td class="num">${esc(x.phone||'-')}</td><td>${esc(x.type)}</td><td>${x.qty}</td><td>${x.cook?'نعم'+(x.cookNote?' — '+esc(x.cookNote):''):'—'}</td><td>${esc(x.pay)}</td><td class="num"><b>${money(x.total)}</b></td>
+      days[d].forEach(x=>{rows+=`<tr><td>${d.slice(8)}/${d.slice(5,7)}</td><td>${esc(x.name)}</td><td class="num">${esc(x.phone||'-')}</td><td>${esc(x.type)}</td><td>${qtyTxt(x.qty)}</td><td>${esc(x.pay)}</td><td class="num"><b>${money(x.total)}</b></td>
       <td class="act"><button class="icon-btn" type="button" data-edit="${x.id}" aria-label="تعديل">✏️</button>${(x.images||[]).length?`<button class="icon-btn" type="button" data-view-img="${x.id}" aria-label="الفاتورة">🧾</button>`:''}<button class="icon-btn del" type="button" data-del="${x.id}" aria-label="حذف">🗑️</button></td></tr>`});
       const s=summarize(days[d]);
-      rows+=`<tr class="day-sub"><td colspan="4">إجمالي مبيعات ${dayLabel(d)}</td><td>${s.sheep+s.goats+s.camels}</td><td></td><td></td><td class="num">${money(s.total)}</td><td class="act"></td></tr>`;
+      rows+=`<tr class="day-sub"><td colspan="4">إجمالي مبيعات ${dayLabel(d)}</td><td>${qtyTxt(s.sheep+s.goats+s.camels+s.cook)}</td><td></td><td class="num">${money(s.total)}</td><td class="act"></td></tr>`;
     });
-    c.innerHTML=`<div class="table-box"><table><thead><tr><th>التاريخ</th><th>الزبون</th><th>الرقم</th><th>النوع</th><th>العدد</th><th>طبخ</th><th>الدفع</th><th>المبلغ</th><th class="act">إجراءات</th></tr></thead><tbody>${rows}</tbody></table></div>`
-      +`<h3 class="sec-title">إجمالي المبيعات لكل يوم</h3><div class="table-box"><table class="days-table"><thead><tr><th>التاريخ</th><th>عدد العمليات</th><th>خراف</th><th>تيوس</th><th>حوار</th><th>طبخ</th><th>إجمالي المبيعات</th></tr></thead><tbody>${Object.keys(days).sort().map(d=>{const s=summarize(days[d]);return `<tr><td>${dayLabel(d)}</td><td>${s.ops}</td><td>${s.sheep}</td><td>${s.goats}</td><td>${s.camels}</td><td>${s.cook}</td><td class="num"><b>${money(s.total)}</b></td></tr>`}).join('')}</tbody></table></div>`
+    c.innerHTML=`<div class="table-box"><table><thead><tr><th>التاريخ</th><th>الزبون</th><th>الرقم</th><th>النوع</th><th>العدد</th><th>الدفع</th><th>المبلغ</th><th class="act">إجراءات</th></tr></thead><tbody>${rows}</tbody></table></div>`
+      +`<h3 class="sec-title">إجمالي المبيعات لكل يوم</h3><div class="table-box"><table class="days-table"><thead><tr><th>التاريخ</th><th>عدد العمليات</th><th>خراف</th><th>تيوس</th><th>حوار</th><th>طبخ</th><th>إجمالي المبيعات</th></tr></thead><tbody>${Object.keys(days).sort().map(d=>{const s=summarize(days[d]);return `<tr><td>${dayLabel(d)}</td><td>${s.ops}</td><td>${qtyTxt(s.sheep)}</td><td>${qtyTxt(s.goats)}</td><td>${qtyTxt(s.camels)}</td><td>${qtyTxt(s.cook)}</td><td class="num"><b>${money(s.total)}</b></td></tr>`}).join('')}</tbody></table></div>`
       +ticket('ملخص الشهر — '+monthLabel(curMonth),summarize(list),'إجمالي مبيعات الشهر');
   }
 }
@@ -408,8 +406,7 @@ function closeModal(m){m.classList.remove('open');m.setAttribute('aria-hidden','
 $$('.modal').forEach(m=>{m.addEventListener('click',e=>{if(e.target===m||e.target.hasAttribute('data-close'))closeModal(m)})});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')$$('.modal.open').forEach(closeModal)});
 
-function toggleCook(){$('#fCookNote').hidden=!$('#cYes').checked}
-$$('input[name="fCook"]').forEach(r=>r.addEventListener('change',toggleCook));
+document.addEventListener('click',e=>{const b=e.target.closest('[data-q]');if(!b)return;const i=$('#fQty');let v=(parseFloat(i.value)||0)+(+b.dataset.q);if(v<0.5)v=0.5;i.value=Math.round(v*2)/2});
 function calcTotal(){const t=(+$('#fPrice').value||0);$('#fTotal').textContent=money(t);return t}
 ['#fQty','#fPrice'].forEach(s=>$(s).addEventListener('input',calcTotal));
 
@@ -434,22 +431,22 @@ function openForm(id){
   $('#fName').value=x?x.name:'';$('#fPhone').value=x?x.phone:'';
   $('#fQty').value=x?x.qty:1;$('#fPrice').value=x?x.total:'';
   $('#fNotes').value=x?x.notes:'';
-  $(x&&x.type==='تيس'?'#tGoat':x&&x.type==='حوار'?'#tCamel':'#tSheep').checked=true;$(x&&x.cook?'#cYes':'#cNo').checked=true;$('#fCookNote').value=x&&x.cookNote||'';toggleCook();
+  $(x&&x.type==='تيس'?'#tGoat':x&&x.type==='حوار'?'#tCamel':x&&x.type==='طبخ'?'#tCook':'#tSheep').checked=true;
   const p=$$('input[name="fPay"]').find(r=>r.value===(x?x.pay:'كاش'));if(p)p.checked=true;
-  formImgs=x?[...(x.images||[])]:[];drawThumbs();calcTotal();setAutoStatus('صوّر الفاتورة وسيتم تعبئة الاسم والرقم والنوع والطبخ والعدد والمبلغ وطريقة الدفع. راجع البيانات قبل الحفظ.');
+  formImgs=x?[...(x.images||[])]:[];drawThumbs();calcTotal();setAutoStatus('صوّر الفاتورة وسيتم تعبئة الاسم والرقم والنوع والعدد والمبلغ وطريقة الدفع. راجع البيانات قبل الحفظ.');
   openModal('#formModal');setTimeout(()=>$('#fName').focus(),50);
 }
 
 $('#saveBtn').addEventListener('click',async()=>{
-  const name=$('#fName').value.trim(),date=$('#fDate').value,qty=parseInt($('#fQty').value,10),price=parseFloat($('#fPrice').value);
+  const name=$('#fName').value.trim(),date=$('#fDate').value,qty=Math.round(parseFloat(String($('#fQty').value).replace(',','.'))*100)/100,price=parseFloat($('#fPrice').value);
   if(!date){toast('اختر التاريخ');return}
   if(!name){toast('اكتب اسم الزبون');$('#fName').focus();return}
-  if(!(qty>0)){toast('العدد يجب أن يكون 1 أو أكثر');$('#fQty').focus();return}
+  if(!(qty>0)){toast('اكتب العدد (مثال: 1 أو 1.5 أو 2.5)');$('#fQty').focus();return}
   if(!(price>=0)){toast('اكتب المبلغ الإجمالي');$('#fPrice').focus();return}
   const old=editingId?sales.find(s=>s.id===editingId):null;
   const rec={id:old?old.id:'s'+Date.now()+Math.random().toString(36).slice(2,6),created:old?old.created:Date.now(),
     date,name,phone:$('#fPhone').value.trim(),type:$('input[name="fType"]:checked').value,qty,price:qty?price/qty:price,total:price,
-    pay:$('input[name="fPay"]:checked').value,cook:$('#cYes').checked,cookNote:$('#cYes').checked?$('#fCookNote').value.trim():'',notes:$('#fNotes').value.trim(),images:[...formImgs]};
+    pay:$('input[name="fPay"]:checked').value,notes:$('#fNotes').value.trim(),images:[...formImgs]};
   try{await dbPut(rec)}catch(e){toast('لم يتم الحفظ: مساحة الجهاز ممتلئة أو التخزين غير متاح');return}
   if(old)sales[sales.indexOf(old)]=rec;else sales.push(rec);
   closeModal($('#formModal'));
@@ -465,7 +462,7 @@ document.addEventListener('click',e=>{
   else if(t.dataset.edit)openForm(t.dataset.edit);
   else if(t.dataset.del){
     const x=sales.find(s=>s.id===t.dataset.del);if(!x)return;
-    pendingDelete=x.id;$('#confirmText').textContent=`سيتم حذف بيع ${x.qty} ${x.type} للزبون ${x.name} بمبلغ ${money(x.total)} مع صور الفاتورة.`;
+    pendingDelete=x.id;$('#confirmText').textContent=`سيتم حذف بيع ${qtyTxt(x.qty)} ${x.type} للزبون ${x.name} بمبلغ ${money(x.total)} مع صور الفاتورة.`;
     openModal('#confirmModal');
   }
   else if(t.dataset.viewImg){
@@ -492,11 +489,10 @@ $('#printBtn').addEventListener('click',()=>{try{window.print()}catch(e){toast('
 /* ---------- auto-fill from invoice photo ---------- */
 const AUTO_PROMPT=`هذه صورة فاتورة بيع ذبيحة (خروف أو تيس) من مطعم تنوركو في الإمارات. اقرأ الفاتورة واستخرج البيانات.
 أرجع JSON فقط، بدون أي كلام آخر، بهذا الشكل بالضبط:
-{"name":string|null,"phone":string|null,"type":"خروف"|"تيس"|"حوار"|null,"cook":true|false|null,"cookNote":string|null,"qty":number|null,"price":number|null,"total":number|null,"pay":"كاش"|"بطاقة"|"تحويل بنكي"|"آجل"|null,"date":"YYYY-MM-DD"|null}
+{"name":string|null,"phone":string|null,"type":"خروف"|"تيس"|"حوار"|"طبخ"|null,"qty":number|null,"price":number|null,"total":number|null,"pay":"كاش"|"بطاقة"|"تحويل بنكي"|"آجل"|null,"date":"YYYY-MM-DD"|null}
 - name: اسم الزبون. phone: رقم هاتف الزبون (وليس رقم المطعم 0500888917).
-- type: "خروف" للخروف/الغنم/النعيمي/الحري، و"تيس" للتيس/الماعز/البكري، و"حوار" للحوار/القعود/الجمل الصغير.
-- cook: true إذا الفاتورة فيها طبخ أو تجهيز (مثل مندي، مضغوط، مظبي، طبخ). cookNote: نوع الطبخ إن ذُكر.
-- qty: عدد الرؤوس. price: سعر الرأس الواحد إن وُجد. total: المبلغ الإجمالي المدفوع للفاتورة (الأهم).
+- type: "خروف" للخروف/الغنم/النعيمي/الحري، و"تيس" للتيس/الماعز/البكري، و"حوار" للحوار/القعود/الجمل الصغير.، و"طبخ" إذا الفاتورة رسوم طبخ فقط لذبيحة الزبون نفسه (المطعم طبخها ولم يبعها).
+- qty: عدد الرؤوس، وممكن يكون كسر مثل 1.5 (واحد ونص) أو 2.5. price: سعر الرأس الواحد إن وُجد. total: المبلغ الإجمالي المدفوع للفاتورة (الأهم).
 - pay: كاش/نقدي ← "كاش"، شبكة/فيزا/بطاقة ← "بطاقة"، تحويل ← "تحويل بنكي"، آجل/دين/باقي ← "آجل".
 - حوّل الأرقام العربية (٠-٩) إلى أرقام إنجليزية. أي قيمة غير موجودة أو غير واضحة اكتبها null.`;
 const GEMINI_MODELS=['gemini-3.6-flash','gemini-flash-latest','gemini-3.5-flash','gemini-3.1-flash-lite','gemini-flash-lite-latest'];
@@ -590,9 +586,8 @@ function applyAuto(o){
   let n=0;
   if(o.name){$('#fName').value=o.name;mark('#fName');n++}
   if(o.phone){$('#fPhone').value=String(o.phone).replace(/[^\d+]/g,'');mark('#fPhone');n++}
-  if(['تيس','خروف','حوار'].includes(o.type)){$(o.type==='تيس'?'#tGoat':o.type==='حوار'?'#tCamel':'#tSheep').checked=true;n++}
-  if(o.cook===true){$('#cYes').checked=true;if(o.cookNote)$('#fCookNote').value=o.cookNote;toggleCook();n++}
-  const qty=+o.qty>0?Math.round(+o.qty):null;
+  if(['تيس','خروف','حوار','طبخ'].includes(o.type)){$(o.type==='تيس'?'#tGoat':o.type==='حوار'?'#tCamel':o.type==='طبخ'?'#tCook':'#tSheep').checked=true;n++}
+  const qty=+o.qty>0?Math.round(+o.qty*2)/2:null;
   if(qty){$('#fQty').value=qty;mark('#fQty');n++}
   let price=+o.total>0?+o.total:null;
   if(!price&&+o.price>0)price=+o.price*(qty||+$('#fQty').value||1);
